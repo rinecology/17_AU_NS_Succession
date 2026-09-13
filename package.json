@@ -1,0 +1,20 @@
+{
+  "name": "au-ns-natural-succession",
+  "version": "0.1.0",
+  "description": "Natural succession proportions and pathway charts from AU_NS (or similar) codes",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "author": "Ontario Ministry of Natural Resources",
+  "license": "MIT",
+  "dependencies": {
+    "papaparse": "^5.4.1",
+    "plotly.js-dist-min": "^2.35.2"
+  },
+  "devDependencies": {
+    "vite": "^5.0.0"
+  }
+}

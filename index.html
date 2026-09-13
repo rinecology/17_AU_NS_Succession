@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Natural succession pathways</title>
+    <link rel="stylesheet" href="/src/styles.css">
+</head>
+<body>
+    <div id="app">
+        <header class="app-header">
+            <div class="header-content">
+                <img src="/ON_POS_LOGO_MAGENTA_RGB.PNG" alt="Government of Ontario" class="ontario-logo">
+                <div class="header-text">
+                    <p class="header-kicker">Ontario Ministry of Natural Resources</p>
+                    <h1>Natural succession pathways</h1>
+                    <p class="header-sub">Turn an AU_NS (or similar) column into from → to proportions and charts. Does not assign units — use the Forest Unit Analysis app for that.</p>
+                </div>
+            </div>
+        </header>
+
+        <div id="app-banner" class="app-banner" hidden role="alert"></div>
+
+        <main>
+            <ol class="flow-steps" aria-label="Workflow">
+                <li id="step-upload" class="is-current"><span class="flow-num">1</span> Upload</li>
+                <li id="step-configure"><span class="flow-num">2</span> Decode</li>
+                <li id="step-results"><span class="flow-num">3</span> Pathways</li>
+            </ol>
+
+            <section id="upload-section" class="section">
+                <h2>Inventory with AU codes</h2>
+                <p class="section-lead">CSV that already has an analysis-unit column (e.g. <code>AU_NS</code>, <code>yFU_NatSucn_AU</code>) and preferably hectares. Codes such as <code>BW1_PO1</code> are decoded using your unit list.</p>
+                <div id="drop-zone" class="drop-zone">
+                    <p class="drop-title">Drop a CSV here</p>
+                    <p class="drop-or">or</p>
+                    <button type="button" id="browse-btn" class="btn btn-primary">Browse files</button>
+                    <button type="button" id="sample-btn" class="btn btn-secondary">Load sample</button>
+                    <input type="file" id="file-input" accept=".csv" hidden>
+                </div>
+                <div id="file-info" class="file-chip" hidden></div>
+            </section>
+
+            <section id="config-section" class="section" hidden>
+                <h2>How the codes are written</h2>
+                <p class="section-lead">Planning teams encode pathways differently. Pick the column and the pattern. The default unit list is NER Boreal; replace it if your FMU uses other codes.</p>
+
+                <div class="config-grid">
+                    <div class="config-col">
+                        <div class="form-group">
+                            <label>Code source</label>
+                            <label class="radio-row"><input type="radio" name="mode" value="code" checked> One column (e.g. <code>BW1_PO1</code>)</label>
+                            <label class="radio-row"><input type="radio" name="mode" value="columns"> Separate from / to columns</label>
+                        </div>
+                        <div class="form-group" id="au-col-group">
+                            <label for="au-column">AU / pathway column</label>
+                            <select id="au-column" class="form-control"></select>
+                        </div>
+                        <div class="form-group" id="from-col-group" hidden>
+                            <label for="from-column">Current unit column</label>
+                            <select id="from-column" class="form-control"></select>
+                        </div>
+                        <div class="form-group" id="to-col-group" hidden>
+                            <label for="to-column">Successor column</label>
+                            <select id="to-column" class="form-control"></select>
+                        </div>
+                        <div class="form-group">
+                            <label for="area-column">Area column</label>
+                            <select id="area-column" class="form-control"></select>
+                            <small class="form-hint">Leave empty to count records. Shape_Area is treated as m² → ha.</small>
+                        </div>
+                    </div>
+                    <div class="config-col">
+                        <div class="form-group" id="delim-group">
+                            <label for="delimiter">Delimiter in the code</label>
+                            <select id="delimiter" class="form-control">
+                                <option value="_">Underscore (BW1_PO1)</option>
+                                <option value="-">Hyphen (BW1-PO1)</option>
+                                <option value="auto">Auto (_ or -)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="unit-list">Known forest units <small>(longest match wins; order does not matter)</small></label>
+                            <textarea id="unit-list" class="form-control mono" rows="6"></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="process-bar">
+                    <p class="process-hint">Proportions are within each <strong>current</strong> unit (rows of BW1 sum to 100%).</p>
+                    <button type="button" id="run-btn" class="btn btn-success">Compute pathways</button>
+                </div>
+            </section>
+
+            <section id="results-section" class="section" hidden>
+                <h2>Pathways</h2>
+                <div class="results-summary">
+                    <div class="summary-card"><h3>Parsed rows</h3><p id="stat-parsed" class="stat">—</p></div>
+                    <div class="summary-card"><h3>Unparsed</h3><p id="stat-unparsed" class="stat">—</p></div>
+                    <div class="summary-card"><h3>Current units</h3><p id="stat-from" class="stat">—</p></div>
+                    <div class="summary-card"><h3>Area</h3><p id="stat-area" class="stat">—</p></div>
+                </div>
+                <div class="results-actions">
+                    <button type="button" id="download-csv-btn" class="btn btn-secondary">Download pathway CSV</button>
+                    <button type="button" id="reset-btn" class="btn btn-secondary">New file</button>
+                </div>
+                <h3>Flow</h3>
+                <div id="sankey" class="chart"></div>
+                <h3>Transition matrix (% of current unit)</h3>
+                <div id="heatmap" class="chart"></div>
+                <h3>Table</h3>
+                <div class="table-container">
+                    <table id="path-table" class="results-table"></table>
+                </div>
+            </section>
+        </main>
+
+        <footer class="app-footer">
+            <p>Ontario Ministry of Natural Resources · Natural succession pathways v0.1 · Prototype. Assignment stays in the Forest Unit Analysis app.</p>
+        </footer>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+</body>
+</html>
