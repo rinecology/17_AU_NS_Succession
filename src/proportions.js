@@ -1,13 +1,13 @@
 import { parseCode } from './parse.js';
 
-function toHa(value, unit) {
+export function toHa(value, unit) {
     const n = Number(String(value ?? '').replace(/,/g, ''));
     if (!Number.isFinite(n)) return 0;
     if (unit === 'm2') return n / 10000;
     return n;
 }
 
-function guessAreaUnit(columnName, sampleValues) {
+export function guessAreaUnit(columnName, sampleValues) {
     if (/m2|shape_area|poly_area/i.test(columnName || '')) return 'm2';
     const nums = sampleValues.map(Number).filter(n => Number.isFinite(n) && n > 0);
     if (nums.length && nums.every(n => n > 5000)) return 'm2';

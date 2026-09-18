@@ -3,10 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Natural succession pathways</title>
-  <script type="module" crossorigin src="./assets/index-DDmAh-Lk.js"></script>
+    <title>Succession pathways</title>
+  <script type="module" crossorigin src="./assets/index-Cd-QvnvI.js"></script>
   <link rel="modulepreload" crossorigin href="./assets/vendor-D6enZkz1.js">
-  <link rel="stylesheet" crossorigin href="./assets/index-CccNqz6M.css">
+  <link rel="stylesheet" crossorigin href="./assets/index-Didt2tJa.css">
 </head>
 <body>
     <div id="app">
@@ -15,8 +15,8 @@
                 <img src="./ON_POS_LOGO_MAGENTA_RGB.PNG" alt="Government of Ontario" class="ontario-logo">
                 <div class="header-text">
                     <p class="header-kicker">Ontario Ministry of Natural Resources</p>
-                    <h1>Natural succession pathways</h1>
-                    <p class="header-sub">Turn an AU_NS (or similar) column into from → to proportions and charts. Does not assign units — use the Forest Unit Analysis app for that.</p>
+                    <h1>Succession pathways</h1>
+                    <p class="header-sub">Chart natural succession codes, or assign post-renewal analysis units from a lookup table. Everything stays in this browser.</p>
                 </div>
             </div>
         </header>
@@ -24,7 +24,13 @@
         <div id="app-banner" class="app-banner" hidden role="alert"></div>
 
         <main>
-            <ol class="flow-steps" aria-label="Workflow">
+            <nav class="task-tabs" role="tablist" aria-label="Task">
+                <button type="button" class="task-tab is-active" data-task="chart" id="tab-chart">Chart pathways</button>
+                <button type="button" class="task-tab" data-task="assign" id="tab-assign">Assign post-renewal</button>
+            </nav>
+
+            <div id="chart-task">
+            <ol class="flow-steps" id="chart-steps" aria-label="Chart workflow">
                 <li id="step-upload" class="is-current"><span class="flow-num">1</span> Upload</li>
                 <li id="step-configure"><span class="flow-num">2</span> Decode</li>
                 <li id="step-results"><span class="flow-num">3</span> Pathways</li>
@@ -32,7 +38,7 @@
 
             <section id="upload-section" class="section">
                 <h2>Inventory with AU codes</h2>
-                <p class="section-lead">CSV that already has an analysis-unit column (e.g. <code>AU_NS</code>, <code>yFU_NatSucn_AU</code>) and preferably hectares. Codes such as <code>BW1_PO1</code> are decoded using your unit list.</p>
+                <p class="section-lead">CSV that already has an analysis-unit column (e.g. <code>AU_NS</code>, <code>AU_PRS</code>, <code>yFU_NatSucn_AU</code>) and preferably hectares. Two-part codes such as <code>BW1_PO1</code> and four-part codes such as <code>SB1_Seed_SB1_LC1</code> both work.</p>
                 <div id="drop-zone" class="drop-zone">
                     <p class="drop-title">Drop a CSV here</p>
                     <p class="drop-or">or</p>
@@ -115,10 +121,151 @@
                     <table id="path-table" class="results-table"></table>
                 </div>
             </section>
+            </div>
+
+            <div id="assign-task" hidden>
+            <ol class="flow-steps" id="assign-steps" aria-label="Assign workflow">
+                <li id="assign-step-upload" class="is-current"><span class="flow-num">1</span> Upload</li>
+                <li id="assign-step-map"><span class="flow-num">2</span> Map</li>
+                <li id="assign-step-results"><span class="flow-num">3</span> Assign</li>
+            </ol>
+
+            <section id="assign-upload-section" class="section">
+                <h2>Inventory and lookup</h2>
+                <p class="section-lead">Two CSVs. The lookup holds stratum keys (e.g. <code>PLANFU</code> + <code>DEVSTAGE</code>), the value to write (e.g. <code>AU_PRS</code>), and a proportion that sums to 100 within each stratum. The inventory gets that column filled so <strong>area</strong> shares match — polygons are not split.</p>
+                <div class="upload-pair">
+                    <div>
+                        <h3 class="upload-label">Inventory</h3>
+                        <div id="prs-inv-drop" class="drop-zone">
+                            <p class="drop-title">Drop inventory CSV</p>
+                            <p class="drop-or">or</p>
+                            <button type="button" id="prs-inv-browse" class="btn btn-primary">Browse</button>
+                            <input type="file" id="prs-inv-input" accept=".csv" hidden>
+                        </div>
+                        <div id="prs-inv-chip" class="file-chip" hidden></div>
+                    </div>
+                    <div>
+                        <h3 class="upload-label">Lookup table</h3>
+                        <div id="prs-lu-drop" class="drop-zone">
+                            <p class="drop-title">Drop lookup CSV</p>
+                            <p class="drop-or">or</p>
+                            <button type="button" id="prs-lu-browse" class="btn btn-primary">Browse</button>
+                            <input type="file" id="prs-lu-input" accept=".csv" hidden>
+                        </div>
+                        <div id="prs-lu-chip" class="file-chip" hidden></div>
+                    </div>
+                </div>
+                <p class="sample-row">
+                    <button type="button" id="prs-sample-btn" class="btn btn-secondary">Load sample</button>
+                    <span class="form-hint">Excel must be saved as CSV UTF-8 first.</span>
+                </p>
+            </section>
+
+            <section id="assign-config-section" class="section" hidden>
+                <h2>Column mapping</h2>
+                <p class="section-lead">Stratum columns join the two files. Default area is <code>HA</code> / <code>AREA_HA</code> / <code>Shape_Area</code>. Output name is whatever you want written onto the inventory.</p>
+                <div class="config-grid">
+                    <div class="config-col">
+                        <div class="form-group">
+                            <label>Stratum columns <small>(lookup → inventory)</small></label>
+                            <div id="prs-stratum-list" class="stratum-list"></div>
+                            <button type="button" id="prs-add-stratum" class="btn-link">Add stratum column</button>
+                        </div>
+                        <div class="form-group">
+                            <label for="prs-value-col">Value column in lookup</label>
+                            <select id="prs-value-col" class="form-control"></select>
+                        </div>
+                        <div class="form-group">
+                            <label for="prs-prop-col">Proportion column</label>
+                            <select id="prs-prop-col" class="form-control"></select>
+                            <small class="form-hint">45 / 55 or 0.45 / 0.55. Groups that do not sum to 100% are normalized.</small>
+                        </div>
+                    </div>
+                    <div class="config-col">
+                        <div class="form-group">
+                            <label for="prs-area-col">Area column in inventory</label>
+                            <select id="prs-area-col" class="form-control"></select>
+                            <small class="form-hint">Shape_Area is treated as m² → ha. None = count polygons (not recommended).</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="prs-out-col">Output column name</label>
+                            <input id="prs-out-col" class="form-control" type="text" value="AU_PRS" autocomplete="off">
+                        </div>
+                        <div class="form-group">
+                            <label for="prs-poly-col">POLYTYPE column</label>
+                            <select id="prs-poly-col" class="form-control"></select>
+                        </div>
+                        <div class="form-group">
+                            <label for="prs-poly-filter">Keep POLYTYPE</label>
+                            <select id="prs-poly-filter" class="form-control"></select>
+                        </div>
+                        <div class="form-group">
+                            <label for="prs-seed">Random seed</label>
+                            <input id="prs-seed" class="form-control" type="number" value="1" min="1" step="1">
+                            <small class="form-hint">Same seed + same files = same assignment.</small>
+                        </div>
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="prs-case" checked>
+                            Match stratum values without regard to case <small>(NAT = Nat)</small>
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="prs-collapse">
+                            Collapse FIM DEVSTAGE to Nat / Plant / Seed
+                            <small>(NEWSEED→Seed, ESTPLANT→Plant, NAT/ESTNAT→Nat. DEPHARV is left unmatched.)</small>
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="prs-fill-blanks">
+                            Only fill blank output cells
+                        </label>
+                    </div>
+                </div>
+                <div class="process-bar">
+                    <p class="process-hint">Assignment is by <strong>area</strong> within each stratum, then shuffled. Whole polygons stay whole.</p>
+                    <button type="button" id="prs-assign-btn" class="btn btn-success">Assign</button>
+                </div>
+            </section>
+
+            <section id="assign-results-section" class="section" hidden>
+                <h2>Assignment</h2>
+                <div class="results-summary">
+                    <div class="summary-card"><h3>Assigned rows</h3><p id="prs-stat-assigned" class="stat">—</p></div>
+                    <div class="summary-card"><h3>Assigned area</h3><p id="prs-stat-area" class="stat">—</p></div>
+                    <div class="summary-card"><h3>Unmatched rows</h3><p id="prs-stat-unmatched" class="stat">—</p></div>
+                    <div class="summary-card"><h3>Strata used</h3><p id="prs-stat-strata" class="stat">—</p></div>
+                </div>
+                <div class="results-actions">
+                    <button type="button" id="prs-download-inv" class="btn btn-success">Download inventory CSV</button>
+                    <button type="button" id="prs-download-qa" class="btn btn-secondary">Download expected vs observed</button>
+                    <button type="button" id="prs-chart-btn" class="btn btn-secondary">Chart these pathways</button>
+                    <button type="button" id="prs-reset-btn" class="btn btn-secondary">New files</button>
+                </div>
+                <h3>Expected vs observed (area)</h3>
+                <p class="form-hint">Highlighted rows miss the lookup by more than 5 percentage points.</p>
+                <div class="table-container">
+                    <table id="prs-qa-table" class="results-table"></table>
+                </div>
+                <div class="mismatch-pair">
+                    <div id="prs-unmatched-wrap" hidden>
+                        <h3>Inventory strata not in the lookup</h3>
+                        <p class="form-hint">Present in the inventory (after POLYTYPE filter) but no lookup row. Those polygons were left unassigned.</p>
+                        <div class="table-container">
+                            <table id="prs-unmatched-table" class="results-table"></table>
+                        </div>
+                    </div>
+                    <div id="prs-unused-wrap" hidden>
+                        <h3>Lookup strata not in the inventory</h3>
+                        <p class="form-hint">Present in the lookup but no matching inventory rows were assigned. Check spelling, DEVSTAGE coding, and the POLYTYPE filter.</p>
+                        <div class="table-container">
+                            <table id="prs-unused-table" class="results-table"></table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            </div>
         </main>
 
         <footer class="app-footer">
-            <p>Ontario Ministry of Natural Resources · Natural succession pathways v0.1 · Prototype. Assignment stays in the Forest Unit Analysis app.</p>
+            <p>Ontario Ministry of Natural Resources · Succession pathways v0.2 · Natural-succession assignment (SQL) stays in the Forest Unit Analysis app. Post-renewal assignment is here.</p>
         </footer>
     </div>
 </body>

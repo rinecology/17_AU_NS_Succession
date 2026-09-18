@@ -28,6 +28,12 @@ export function parseCode(raw, { delimiter = '_', units = NER_BOREAL_UNITS } = {
     const byLen = [...units].sort((a, b) => b.length - a.length);
 
     for (const d of delims) {
+        if (!code.includes(d)) continue;
+        const parts = code.split(d).filter(Boolean);
+        // Post-renewal style: PLANFU_DEVSTAGE_from_to (SB1_Seed_SB1_LC1) → SB1 → LC1
+        if (parts.length >= 4) {
+            return { from: parts[0], to: parts[parts.length - 1], raw: code, parsed: true };
+        }
         const idx = findSplit(code, d, byLen);
         if (idx > 0) {
             const from = code.slice(0, idx);
@@ -59,18 +65,21 @@ function findSplit(code, delim, unitsByLen) {
 
 export function detectAuColumn(headers) {
     const lower = headers.map(h => h.toLowerCase());
-    const preferred = ['au_ns', 'au_succ', 'yfu_natsucn_au', 'yfu_au', 'au_ns_code', 'pathway', 'succ_au'];
+    const preferred = [
+        'au_ns', 'au_succ', 'yfu_natsucn_au', 'yfu_au', 'au_ns_code',
+        'pathway', 'succ_au', 'au_prs', 'post_renewal', 'si_au'
+    ];
     for (const key of preferred) {
         const i = lower.indexOf(key);
         if (i >= 0) return headers[i];
     }
-    const fuzzy = headers.find(h => /au.?ns|natsucn|succ/i.test(h) || /^yfu_/i.test(h));
+    const fuzzy = headers.find(h => /au.?ns|au.?prs|natsucn|succ|post.?renew/i.test(h) || /^yfu_/i.test(h));
     return fuzzy || '';
 }
 
 export function detectAreaColumn(headers) {
     const lower = headers.map(h => h.toLowerCase());
-    const preferred = ['hectares', 'area_ha', 'ha', 'area', 'shape_area', 'poly_area'];
+    const preferred = ['hectares', 'area_ha', 'area_hectares', 'ha', 'area', 'shape_area', 'poly_area'];
     for (const key of preferred) {
         const i = lower.indexOf(key);
         if (i >= 0) return headers[i];

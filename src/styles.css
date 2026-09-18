@@ -62,7 +62,31 @@ body {
     color: var(--fu-forest);
     margin: 0;
 }
-.header-sub { font-size: 0.9rem; color: var(--fu-muted); margin: 0.15rem 0 0; max-width: 40rem; }
+.header-sub { font-size: 0.9rem; color: var(--fu-muted); margin: 0.15rem 0 0; max-width: 46rem; }
+
+.task-tabs {
+    display: flex;
+    gap: 0.15rem;
+    margin: 0 0 1.1rem;
+    border-bottom: 1px solid var(--fu-border);
+}
+.task-tab {
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    padding: 0.55rem 1.05rem;
+    font-weight: 600;
+    font-size: 0.95rem;
+    color: var(--fu-muted);
+    cursor: pointer;
+    font-family: inherit;
+}
+.task-tab:hover { color: var(--fu-forest); }
+.task-tab.is-active {
+    color: var(--fu-forest);
+    border-bottom-color: var(--fu-forest);
+}
 
 main { max-width: 1120px; margin: 0 auto; padding: 1.25rem 1.25rem 2.5rem; }
 
@@ -73,9 +97,10 @@ main { max-width: 1120px; margin: 0 auto; padding: 1.25rem 1.25rem 2.5rem; }
     border-radius: 10px;
     border: 1px solid var(--fu-border);
 }
-.app-banner[hidden] { display: none; }
+
 .app-banner.is-error { background: var(--fu-danger-bg); color: var(--fu-danger); }
 .app-banner.is-info { background: #e8f1f3; color: #3d5c66; }
+.app-banner.is-ok { background: var(--fu-ok-bg); color: var(--fu-ok); }
 
 .flow-steps {
     display: flex;
@@ -113,7 +138,11 @@ main { max-width: 1120px; margin: 0 auto; padding: 1.25rem 1.25rem 2.5rem; }
     box-shadow: var(--fu-shadow);
     border: 1px solid var(--fu-border);
 }
-.section[hidden] { display: none; }
+.section[hidden],
+.form-group[hidden],
+.file-chip[hidden],
+.app-banner[hidden],
+[hidden] { display: none !important; }
 .section h2 { color: var(--fu-forest); margin: 0 0 0.35rem; font-size: 1.2rem; }
 .section-lead { color: var(--fu-muted); font-size: 0.92rem; margin: 0 0 1rem; max-width: 46rem; }
 
@@ -133,7 +162,7 @@ main { max-width: 1120px; margin: 0 auto; padding: 1.25rem 1.25rem 2.5rem; }
     background: var(--fu-ok-bg); border: 1px solid #c5d9cb;
     border-radius: 10px; padding: 0.7rem 1rem;
 }
-.file-chip[hidden] { display: none; }
+
 
 .config-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem 1.75rem; }
 .form-group { display: flex; flex-direction: column; gap: 6px; margin-bottom: 0.85rem; }
@@ -154,6 +183,33 @@ main { max-width: 1120px; margin: 0 auto; padding: 1.25rem 1.25rem 2.5rem; }
 .btn-secondary { background: #fff; border-color: #c9c0b5; color: #5c564f; }
 .btn-secondary:hover { background: #f3eee6; }
 .drop-zone .btn { margin: 0 4px; }
+
+.upload-pair,
+.mismatch-pair {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+.mismatch-pair > [hidden] { display: none !important; }
+.mismatch-pair:has(> :not([hidden])):has(> [hidden]) {
+    grid-template-columns: 1fr;
+}
+.upload-label { font-size: 0.95rem; color: var(--fu-forest); margin: 0 0 0.5rem; }
+.sample-row { display: flex; align-items: center; gap: 0.75rem; margin: 1rem 0 0; flex-wrap: wrap; }
+.stratum-list { display: flex; flex-direction: column; gap: 0.45rem; margin-bottom: 0.4rem; }
+.stratum-row { display: grid; grid-template-columns: 1fr auto 1fr auto; gap: 0.45rem; align-items: center; }
+.stratum-arrow { color: var(--fu-muted); font-weight: 700; }
+.btn-tiny { padding: 0.4rem 0.65rem; font-size: 0.8rem; }
+.btn-link {
+    background: none; border: none; color: var(--fu-forest); font-weight: 600;
+    cursor: pointer; font-family: inherit; padding: 0; font-size: 0.88rem; text-decoration: underline;
+}
+.checkbox-label {
+    display: flex; gap: 8px; align-items: flex-start; font-weight: 500;
+    margin: 0.45rem 0; font-size: 0.92rem;
+}
+.checkbox-label small { display: block; font-weight: 400; color: var(--fu-muted); }
+.results-table tr.is-flag td { background: #f8ece9; }
 
 .process-bar {
     display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap;
@@ -191,6 +247,7 @@ main { max-width: 1120px; margin: 0 auto; padding: 1.25rem 1.25rem 2.5rem; }
 code { font-size: 0.88em; background: #efe8df; padding: 0.05em 0.3em; border-radius: 4px; }
 
 @media (max-width: 800px) {
-    .config-grid { grid-template-columns: 1fr; }
+    .config-grid, .upload-pair, .mismatch-pair { grid-template-columns: 1fr; }
+    .stratum-row { grid-template-columns: 1fr; }
     .header-content { flex-direction: column; text-align: center; }
 }

@@ -8,6 +8,7 @@ import {
 } from './parse.js';
 import { computePathways, transitionsToCsv } from './proportions.js';
 import { drawSankey, drawHeatmap } from './viz.js';
+import { initAssign } from './assign-ui.js';
 
 let currentData = [];
 let lastResult = null;
@@ -22,7 +23,39 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('input[name="mode"]').forEach(r => {
         r.addEventListener('change', syncModeUi);
     });
+    document.querySelectorAll('.task-tab').forEach(btn => {
+        btn.addEventListener('click', () => setTask(btn.dataset.task));
+    });
+    initAssign({ switchToChart });
 });
+
+function setTask(name) {
+    const chart = name === 'chart';
+    document.getElementById('chart-task').hidden = !chart;
+    document.getElementById('assign-task').hidden = chart;
+    document.querySelectorAll('.task-tab').forEach(btn => {
+        btn.classList.toggle('is-active', btn.dataset.task === name);
+    });
+    hideBanner();
+}
+
+function switchToChart(rows, { auColumn = '', fileName = 'assigned.csv' } = {}) {
+    currentData = rows;
+    setTask('chart');
+    showFileChip(fileName, rows.length);
+    fillColumnSelects(Object.keys(rows[0] || {}));
+    if (auColumn) {
+        const sel = document.getElementById('au-column');
+        if ([...sel.options].some(o => o.value === auColumn)) sel.value = auColumn;
+        const codeRadio = document.querySelector('input[name="mode"][value="code"]');
+        if (codeRadio) codeRadio.checked = true;
+        syncModeUi();
+    }
+    showEl('config-section', true);
+    showEl('results-section', false);
+    setStep('configure');
+    run();
+}
 
 function bindUpload() {
     const zone = document.getElementById('drop-zone');
@@ -212,7 +245,7 @@ function showFileChip(name, n) {
 
 function setStep(name) {
     const map = { upload: 'step-upload', configure: 'step-configure', results: 'step-results' };
-    document.querySelectorAll('.flow-steps li').forEach(li => {
+    document.querySelectorAll('#chart-steps li').forEach(li => {
         li.classList.remove('is-current', 'is-done');
     });
     const order = ['upload', 'configure', 'results'];
