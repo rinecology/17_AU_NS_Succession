@@ -207,10 +207,10 @@ function runAssign() {
             areaCol: document.getElementById('prs-area-col').value,
             outCol,
             seed: seedRaw === '' ? 1 : Number(seedRaw),
-            fillBlanksOnly: document.getElementById('prs-fill-blanks').checked,
+            fillBlanksOnly: isChecked('prs-fill-blanks'),
             polytypeCol: document.getElementById('prs-poly-col').value,
             polytypeFilter: document.getElementById('prs-poly-filter').value,
-            caseInsensitive: document.getElementById('prs-case').checked
+            caseInsensitive: isChecked('prs-case', true)
         });
     } catch (err) {
         showBanner(err.message || String(err));
@@ -382,6 +382,11 @@ function setAssignStep(name) {
         if (idx < i) el.classList.add('is-done');
         if (idx === i) el.classList.add('is-current');
     });
+}
+
+function isChecked(id, fallback = false) {
+    const el = document.getElementById(id);
+    return el ? el.checked : fallback;
 }
 
 function showEl(id, on) {
