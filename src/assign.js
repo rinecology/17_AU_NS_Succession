@@ -73,28 +73,14 @@ export function suggestStratumPairs(lookupHeaders, inventoryHeaders) {
     return pairs;
 }
 
-/**
- * Collapse FIM DEVSTAGE codes to the Nat / Plant / Seed labels used in many PRS tables.
- * Unmapped values (DEPHARV, THINPRE, …) are left as written.
- */
-export function collapseFimDevstage(raw) {
-    const v = String(raw ?? '').trim().toUpperCase();
-    if (!v) return '';
-    if (v.includes('SEED')) return 'Seed';
-    if (v.includes('PLANT')) return 'Plant';
-    if (v.includes('NAT')) return 'Nat';
-    return String(raw ?? '').trim();
-}
-
 export function cellKey(value, caseInsensitive) {
     const s = String(value ?? '').trim();
     return caseInsensitive ? s.toUpperCase() : s;
 }
 
-export function stratumKey(row, columns, { caseInsensitive = true, collapseDevstage = false } = {}) {
+export function stratumKey(row, columns, { caseInsensitive = true } = {}) {
     return columns.map(col => {
-        let v = row[col];
-        if (collapseDevstage && /devstage/i.test(col)) v = collapseFimDevstage(v);
+        const v = row[col];
         return cellKey(v, caseInsensitive);
     }).join('\t');
 }
@@ -175,7 +161,7 @@ export function buildLookupGroups(lookupRows, {
 
     const buckets = new Map();
     for (const row of lookupRows) {
-        const key = stratumKey(row, lookupStratumCols, { caseInsensitive, collapseDevstage: false });
+        const key = stratumKey(row, lookupStratumCols, { caseInsensitive });
         const value = String(row[valueCol] ?? '').trim();
         if (!value) continue;
         const label = formatStratum(lookupStratumCols.map(c => row[c]));
@@ -224,8 +210,7 @@ export function assignPostRenewal(inventory, lookup, options = {}) {
         fillBlanksOnly = false,
         polytypeCol = '',
         polytypeFilter = '',
-        caseInsensitive = true,
-        collapseDevstage = false
+        caseInsensitive = true
     } = options;
 
     if (!inventoryStratumCols?.length || inventoryStratumCols.length !== lookupStratumCols.length) {
@@ -278,12 +263,8 @@ export function assignPostRenewal(inventory, lookup, options = {}) {
             continue;
         }
 
-        const key = stratumKey(row, inventoryStratumCols, { caseInsensitive, collapseDevstage });
-        const label = formatStratum(inventoryStratumCols.map(c => {
-            let v = row[c];
-            if (collapseDevstage && /devstage/i.test(c)) v = collapseFimDevstage(v);
-            return v;
-        }));
+        const key = stratumKey(row, inventoryStratumCols, { caseInsensitive });
+        const label = formatStratum(inventoryStratumCols.map(c => row[c]));
 
         if (!groups.has(key)) {
             unmatchedN++;

@@ -2,7 +2,6 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
     normalizeProportions,
-    collapseFimDevstage,
     stratumKey,
     assignPostRenewal,
     suggestStratumPairs,
@@ -26,18 +25,10 @@ test('normalizeProportions accepts percent and unit interval', () => {
     assert.equal(Number(c.p.reduce((s, n) => s + n, 0).toFixed(6)), 1);
 });
 
-test('collapseFimDevstage maps FIM codes to Nat/Plant/Seed', () => {
-    assert.equal(collapseFimDevstage('NEWSEED'), 'Seed');
-    assert.equal(collapseFimDevstage('ESTPLANT'), 'Plant');
-    assert.equal(collapseFimDevstage('NAT'), 'Nat');
-    assert.equal(collapseFimDevstage('ESTNAT'), 'Nat');
-    assert.equal(collapseFimDevstage('DEPHARV'), 'DEPHARV');
-});
-
-test('stratumKey is case-insensitive and can collapse DEVSTAGE', () => {
-    const row = { PLANFU: 'sb1', DEVSTAGE: 'NEWSEED' };
+test('stratumKey is case-insensitive', () => {
+    const row = { PLANFU: 'sb1', DEVSTAGE: 'seed' };
     assert.equal(
-        stratumKey(row, ['PLANFU', 'DEVSTAGE'], { caseInsensitive: true, collapseDevstage: true }),
+        stratumKey(row, ['PLANFU', 'DEVSTAGE'], { caseInsensitive: true }),
         'SB1\tSEED'
     );
     const lookup = { PLANFU: 'SB1', DEVSTAGE: 'Seed' };
@@ -129,7 +120,7 @@ test('same seed is reproducible; POLYTYPE filter skips WAT', () => {
     assert.equal(a.stats.skippedFilter, 1);
 });
 
-test('unmatched strata stay blank; FIM collapse joins NEWSEED to Seed', () => {
+test('unmatched strata stay blank (NEWSEED does not match Seed)', () => {
     const inv = [
         { PLANFU: 'SB1', DEVSTAGE: 'NEWSEED', AREA_HA: 40, POLYTYPE: 'FOR' },
         { PLANFU: 'SB1', DEVSTAGE: 'NEWSEED', AREA_HA: 60, POLYTYPE: 'FOR' },
@@ -145,15 +136,12 @@ test('unmatched strata stay blank; FIM collapse joins NEWSEED to Seed', () => {
         seed: 1,
         polytypeFilter: ''
     };
-    const off = assignPostRenewal(inv, lookupSb1(), { ...base, collapseDevstage: false });
-    assert.equal(off.rows[0].AU_PRS, '');
-    assert.equal(off.stats.unmatchedN, 3);
-
-    const on = assignPostRenewal(inv, lookupSb1(), { ...base, collapseDevstage: true });
-    assert.ok(on.rows[0].AU_PRS.startsWith('SB1_Seed_'));
-    assert.ok(on.rows[1].AU_PRS.startsWith('SB1_Seed_'));
-    assert.equal(on.rows[2].AU_PRS, '');
-    assert.equal(on.stats.unmatchedN, 1);
+    const result = assignPostRenewal(inv, lookupSb1(), base);
+    // NEWSEED does not match Seed (no collapse), and PJ1 not in lookup
+    assert.equal(result.rows[0].AU_PRS, '');
+    assert.equal(result.rows[1].AU_PRS, '');
+    assert.equal(result.rows[2].AU_PRS, '');
+    assert.equal(result.stats.unmatchedN, 3);
 });
 
 test('sample lookup + inventory: SB1 Seed area is 45/55 after POLYTYPE filter', async () => {

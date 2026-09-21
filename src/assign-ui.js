@@ -210,8 +210,7 @@ function runAssign() {
             fillBlanksOnly: document.getElementById('prs-fill-blanks').checked,
             polytypeCol: document.getElementById('prs-poly-col').value,
             polytypeFilter: document.getElementById('prs-poly-filter').value,
-            caseInsensitive: document.getElementById('prs-case').checked,
-            collapseDevstage: document.getElementById('prs-collapse').checked
+            caseInsensitive: document.getElementById('prs-case').checked
         });
     } catch (err) {
         showBanner(err.message || String(err));

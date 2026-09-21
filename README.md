@@ -50,9 +50,53 @@ Delimiter: `_` (default), `-`, or auto. Proportions sum to 100% **within each cu
 | Lookup CSV | Stratum keys + value + proportion (e.g. `PLANFU`, `DEVSTAGE`, `AU_PRS`, `Proportion`) |
 | Inventory CSV | Same stratum keys, plus area (`AREA_HA` / `HA` / `Shape_Area`) |
 
-The UI maps lookup columns to inventory columns. Optional: keep `POLYTYPE = FOR`, case-insensitive match (`NAT` = `Nat`), collapse FIM `DEVSTAGE` to Nat / Plant / Seed, fill blanks only, random seed.
-
 Excel lookups must be saved as **CSV UTF-8** first.
+
+### Stratum Matching
+
+The app matches inventory strata to lookup strata for assignment. **The lookup table is the source of truth** — inventory DEVSTAGE values must exactly match lookup DEVSTAGE values (case-insensitive matching available). Unmatched rows appear in the QA report for audit and debugging.
+
+**Important**: Ensure your lookup covers all DEVSTAGE codes in your inventory. If inventory has `DEPHARV` but lookup doesn't, those rows won't be assigned. Prepare inventory data so DEVSTAGE aligns with your lookup before upload.
+
+### Configuration options
+
+- **Case-insensitive match**: Treat `NAT` = `Nat` = `nat`
+- **Keep POLYTYPE filter** (e.g., keep only `POLYTYPE = FOR`)
+- **Fill blanks only**: Only assign to empty output cells
+- **Random seed**: For reproducibility (default = 1)
+
+### Assignment Algorithm
+
+For each stratum (e.g., `SB1 | Seed`):
+1. The app calculates target areas for each pathway based on lookup proportions
+2. Whole polygons are assigned using a greedy algorithm to minimize deviation
+3. Small deviations (±5%) are normal since whole polygons cannot be split
+4. **Unmatched strata** (inventory stratum not in lookup) are skipped and reported
+
+### QA Report
+
+The output QA CSV has three sections:
+
+**Stratum summary** — expected vs. observed area and % for each value within each stratum  
+**Unmatched inventory** — rows where stratum was not found in lookup (needs lookup expansion or inventory filtering)  
+**Unused lookup strata** — lookup strata with no matching inventory rows (verify spelling and DEVSTAGE values)
+
+Use the QA report to audit matching accuracy and debug mismatches.
+
+### Troubleshooting Lookup Mismatches
+
+**If nothing matched:**
+- Verify inventory DEVSTAGE values match lookup DEVSTAGE exactly (e.g., `Nat` vs `ESTNAT`)
+- Run the QA report and check "unmatched inventory" section
+- Inventory rows with DEVSTAGE codes not in lookup won't be assigned
+
+**To fix:**
+1. Identify all DEVSTAGE values in your inventory
+2. Ensure your lookup has entries for each DEVSTAGE code you want to assign
+3. If lookup is missing codes (e.g., `DEPHARV`, `LOWMGMT`), either:
+   - Add them to the lookup with appropriate proportions, OR
+   - Pre-filter inventory to exclude those codes before upload
+4. Standardize DEVSTAGE across inventory and lookup (recommend using simplified codes: `Nat`, `Plant`, `Seed` instead of `ESTNAT`, `ESTPLANT`, `ESTSEED`)
 
 ## Pipeline
 
@@ -62,7 +106,7 @@ Forest Unit Analysis (SQL → yFU_* / AU_NS)
 This app, Chart — decode AU_NS → Sankey / heatmap
 
 Lookup table (PLANFU + DEVSTAGE + % )
-        + inventory CSV
+        + inventory CSV (standardized DEVSTAGE values)
         ↓
 This app, Assign — write AU_PRS by area
         ↓
