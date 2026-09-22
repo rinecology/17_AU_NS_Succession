@@ -1,4 +1,5 @@
 import Plotly from 'plotly.js-dist-min';
+import { colorForUnit, hexToRgba } from './unit-colors.js';
 
 const FOREST = '#35594c';
 const ROSE = '#b76e79';
@@ -31,8 +32,8 @@ export function drawSankey(el, transitions) {
             line: { color: '#3a3532', width: 0.4 },
             label: labels,
             color: [
-                ...fromNodes.map(() => 'rgba(53, 89, 76, 0.88)'),
-                ...toNodes.map(() => 'rgba(183, 110, 121, 0.75)')
+                ...fromNodes.map(n => hexToRgba(colorForUnit(n), 0.92)),
+                ...toNodes.map(n => hexToRgba(colorForUnit(n), 0.78))
             ]
         },
         link: {
@@ -40,7 +41,7 @@ export function drawSankey(el, transitions) {
             target: df.map(t => idxTo[t.to]),
             value: df.map(t => t.area_ha),
             label: df.map(t => `${t.from} → ${t.to}  ${(t.proportion * 100).toFixed(1)}% of ${t.from}`),
-            color: df.map(() => 'rgba(196, 168, 130, 0.35)')
+            color: df.map(t => hexToRgba(colorForUnit(t.from), 0.38))
         }
     }];
 

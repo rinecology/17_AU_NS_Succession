@@ -235,6 +235,10 @@ main { max-width: 1120px; margin: 0 auto; padding: 1.25rem 1.25rem 2.5rem; }
     cursor: pointer;
 }
 .fu-chip input { margin: 0; }
+.fu-swatch {
+    width: 0.7rem; height: 0.7rem; border-radius: 50%;
+    border: 1px solid rgba(58, 53, 50, 0.28); flex-shrink: 0;
+}
 .rule-set-sep { color: var(--fu-muted); margin: 0 0.15rem; }
 
 #work-overlay {

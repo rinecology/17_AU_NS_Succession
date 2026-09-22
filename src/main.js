@@ -8,6 +8,7 @@ import {
 } from './parse.js';
 import { computePathways, computePathwaysFromFile, filterPathways, transitionsToCsv } from './proportions.js';
 import { drawSankey, drawHeatmap } from './viz.js';
+import { colorForUnit } from './unit-colors.js';
 import { initAssign } from './assign-ui.js';
 import { peekHeaders, isLargeFile, formatBytes } from './csv-stream.js';
 import { showWork, updateWork, hideWork, progressLine } from './work-overlay.js';
@@ -260,7 +261,8 @@ function fillFuFilter(fromUnits) {
     for (const u of fromUnits || []) {
         const lab = document.createElement('label');
         lab.className = 'fu-chip';
-        lab.innerHTML = `<input type="checkbox" class="fu-from-check" value="${esc(u)}" checked> ${esc(u)}`;
+        lab.innerHTML = `<input type="checkbox" class="fu-from-check" value="${esc(u)}" checked>
+            <span class="fu-swatch" style="background:${colorForUnit(u)}"></span> ${esc(u)}`;
         lab.querySelector('input').addEventListener('change', applyFuFilter);
         box.appendChild(lab);
     }

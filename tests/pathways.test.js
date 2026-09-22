@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { computePathways, filterPathways } from '../src/proportions.js';
 import { collectRows, catalogUniques, formatBytes } from '../src/csv-stream.js';
+import { colorForUnit, UNKNOWN_COLOR } from '../src/unit-colors.js';
 
 const rows = [
     { AU_NS: 'BW1_PO1', HECTARES: 10 },
@@ -37,6 +38,15 @@ test('filterPathways none selected yields empty chart data', () => {
     assert.equal(r.nFrom, 0);
     assert.equal(r.transitions.length, 0);
     assert.equal(r.parsed, 0);
+});
+
+test('colorForUnit is stable and case-insensitive', () => {
+    assert.equal(colorForUnit('SB1'), colorForUnit('sb1'));
+    assert.equal(colorForUnit('BW1'), '#882255');
+    assert.equal(colorForUnit('UnknownX'), UNKNOWN_COLOR);
+    assert.equal(colorForUnit('unknownx'), UNKNOWN_COLOR);
+    assert.notEqual(colorForUnit('SB1'), colorForUnit('BW1'));
+    assert.notEqual(colorForUnit('XX'), colorForUnit('SB1'));
 });
 
 test('formatBytes', () => {
