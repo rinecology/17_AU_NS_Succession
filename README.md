@@ -1,6 +1,6 @@
 # Succession pathways
 
-**Ontario Ministry of Natural Resources** — prototype (v0.2)
+**Ontario Ministry of Natural Resources** — prototype (v0.3)
 
 Two tasks in one browser app:
 
@@ -42,6 +42,20 @@ python3 -m http.server 8000
 **Known unit list** defaults to NER Boreal codes. Edit it for other FMUs so `UPCE_UPCE` and `UDF_Succ` parse instead of splitting on the first underscore blindly.
 
 Delimiter: `_` (default), `-`, or auto. Proportions sum to 100% **within each current unit**.
+
+After compute, **Show current forest units** filters the Sankey, heatmap, and table. Hidden units are not re-proportioned; each remaining unit still sums to 100% of itself.
+
+## Large CSV files
+
+Same idea as the SLYM cutter, kept inside this app:
+
+| Size | Chart | Assign |
+|---|---|---|
+| Under ~200 MB | Load, then compute | Load, then assign |
+| ~200–900 MB | Stream and **sum** pathways (the full table is not kept) | Scan forest units, keep a **subset**, then assign |
+| ~900 MB unfiltered assign | n/a | Blocked — pick forest units or pre-cut the CSV |
+
+A progress overlay reports scan/extract status. Assign will abort if more than 500,000 rows would be kept. Lookup tables are expected to stay small.
 
 ## Assign input
 

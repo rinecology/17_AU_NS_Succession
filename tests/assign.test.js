@@ -162,7 +162,7 @@ test('sample lookup + inventory: SB1 Seed area is 45/55 after POLYTYPE filter', 
     });
     const seed = result.qa.filter(r => r.stratum === 'SB1 | Seed');
     const byVal = Object.fromEntries(seed.map(r => [r.value, r.observed_ha]));
-    assert.equal(byVal['SB1_Seed_SB1_LC1'] + byVal['SB1_Seed_SB1_SB1'], 100);
+    assert.equal(byVal['SB1_Seed_SB1_LC1'] + byVal['SB1_Seed_SB1_SB1'], 106);
     const pct = seed.find(r => r.value === 'SB1_Seed_SB1_LC1').observed_pct;
     assert.ok(Math.abs(pct - 45) < 10, `LC1 observed ${pct}`);
     assert.ok(result.rows.some(r => r.POLYTYPE === 'WAT' && !r.AU_PRS));

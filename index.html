@@ -20,6 +20,13 @@
         </header>
 
         <div id="app-banner" class="app-banner" hidden role="alert"></div>
+        <div id="work-overlay" hidden>
+            <div class="work-card">
+                <h3 id="work-title">Working</h3>
+                <p id="work-detail"></p>
+                <div class="progress-track"><div id="work-bar"></div></div>
+            </div>
+        </div>
 
         <main>
             <nav class="task-tabs" role="tablist" aria-label="Task">
@@ -109,6 +116,18 @@
                 <div class="results-actions">
                     <button type="button" id="download-csv-btn" class="btn btn-secondary">Download pathway CSV</button>
                     <button type="button" id="reset-btn" class="btn btn-secondary">New file</button>
+                </div>
+                <div id="fu-filter-panel" class="fu-filter">
+                    <div class="fu-filter-head">
+                        <strong>Show current forest units</strong>
+                        <span>
+                            <button type="button" id="fu-all" class="btn-link">All</button>
+                            <span class="rule-set-sep">·</span>
+                            <button type="button" id="fu-none" class="btn-link">None</button>
+                        </span>
+                    </div>
+                    <p class="form-hint">Hides units on the Sankey, heatmap, and table. Percentages stay within each remaining unit.</p>
+                    <div id="fu-filter-list" class="fu-filter-list"></div>
                 </div>
                 <h3>Flow</h3>
                 <div id="sankey" class="chart"></div>
@@ -212,6 +231,19 @@
                         </label>
                     </div>
                 </div>
+                <div id="prs-fu-limit" class="fu-filter" hidden>
+                    <div class="fu-filter-head">
+                        <strong>Limit forest units in inventory</strong>
+                        <span>
+                            <button type="button" id="prs-fu-all" class="btn-link">All</button>
+                            <span class="rule-set-sep">·</span>
+                            <button type="button" id="prs-fu-none" class="btn-link">None</button>
+                        </span>
+                    </div>
+                    <p class="form-hint" id="prs-fu-limit-hint">Optional for small files. Required for inventories of about 200 MB or more — the browser cannot hold a 900 MB table.</p>
+                    <div id="prs-fu-limit-list" class="fu-filter-list"></div>
+                    <button type="button" id="prs-fu-scan" class="btn btn-secondary">Scan forest units in file</button>
+                </div>
                 <div class="process-bar">
                     <p class="process-hint">Assignment is by <strong>area</strong> within each stratum, then shuffled. Whole polygons stay whole.</p>
                     <button type="button" id="prs-assign-btn" class="btn btn-success">Assign</button>
@@ -258,7 +290,7 @@
         </main>
 
         <footer class="app-footer">
-            <p>Ontario Ministry of Natural Resources · Succession pathways v0.2 · Natural-succession assignment (SQL) stays in the Forest Unit Analysis app. Post-renewal assignment is here.</p>
+            <p>Ontario Ministry of Natural Resources · Succession pathways v0.3 · Natural-succession assignment (SQL) stays in the Forest Unit Analysis app. Post-renewal assignment is here.</p>
         </footer>
     </div>
     <script type="module" src="/src/main.js"></script>

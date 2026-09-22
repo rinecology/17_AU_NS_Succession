@@ -211,6 +211,54 @@ main { max-width: 1120px; margin: 0 auto; padding: 1.25rem 1.25rem 2.5rem; }
 .checkbox-label small { display: block; font-weight: 400; color: var(--fu-muted); }
 .results-table tr.is-flag td { background: #f8ece9; }
 
+.fu-filter {
+    background: #faf6f1;
+    border: 1px solid var(--fu-border);
+    border-radius: 10px;
+    padding: 0.85rem 1rem 1rem;
+    margin: 0 0 1.1rem;
+}
+.fu-filter-head {
+    display: flex; justify-content: space-between; align-items: baseline; gap: 1rem;
+    margin-bottom: 0.35rem;
+}
+.fu-filter-list {
+    display: flex; flex-wrap: wrap; gap: 0.35rem 0.85rem;
+    max-height: 9.5rem; overflow-y: auto;
+    margin-top: 0.45rem;
+}
+.fu-chip {
+    display: inline-flex; align-items: center; gap: 0.35rem;
+    font-size: 0.88rem; font-weight: 500;
+    background: #fff; border: 1px solid var(--fu-border);
+    border-radius: 999px; padding: 0.2rem 0.65rem;
+    cursor: pointer;
+}
+.fu-chip input { margin: 0; }
+.rule-set-sep { color: var(--fu-muted); margin: 0 0.15rem; }
+
+#work-overlay {
+    position: fixed; inset: 0; z-index: 80;
+    background: rgba(58, 53, 50, 0.35);
+    display: flex; align-items: center; justify-content: center;
+    padding: 1.5rem;
+}
+#work-overlay[hidden] { display: none !important; }
+.work-card {
+    background: var(--fu-card); border-radius: var(--fu-radius);
+    padding: 1.4rem 1.5rem; width: min(28rem, 100%);
+    box-shadow: var(--fu-shadow); border: 1px solid var(--fu-border);
+}
+.work-card h3 { margin: 0 0 0.35rem; color: var(--fu-forest); }
+.work-card p { margin: 0 0 0.85rem; color: var(--fu-muted); font-size: 0.92rem; }
+.progress-track {
+    height: 8px; background: #efe8df; border-radius: 999px; overflow: hidden;
+}
+#work-bar {
+    height: 100%; width: 0; background: var(--fu-forest);
+    transition: width 0.15s linear;
+}
+
 .process-bar {
     display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap;
     margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--fu-border);

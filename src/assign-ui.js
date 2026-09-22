@@ -12,8 +12,21 @@ import {
     unusedLookupToCsv
 } from './assign.js';
 import { detectAreaColumn } from './parse.js';
+import {
+    peekHeaders,
+    collectRows,
+    catalogUniques,
+    isLargeFile,
+    isHardCeiling,
+    formatBytes,
+    MAX_RETAINED_ROWS
+} from './csv-stream.js';
+import { showWork, updateWork, hideWork, progressLine } from './work-overlay.js';
 
 let inventory = [];
+let inventoryFile = null;
+let inventoryHeaders = [];
+let inventoryLarge = false;
 let lookup = [];
 let inventoryName = '';
 let lookupName = '';
@@ -31,6 +44,9 @@ export function initAssign(opts = {}) {
     document.getElementById('prs-download-qa')?.addEventListener('click', downloadQa);
     document.getElementById('prs-chart-btn')?.addEventListener('click', chartAssigned);
     document.getElementById('prs-reset-btn')?.addEventListener('click', resetAssign);
+    document.getElementById('prs-fu-scan')?.addEventListener('click', scanInventoryFus);
+    document.getElementById('prs-fu-all')?.addEventListener('click', () => setAssignFuChecks(true));
+    document.getElementById('prs-fu-none')?.addEventListener('click', () => setAssignFuChecks(false));
 }
 
 function bindDrop(zoneId, inputId, browseId, onFile) {
@@ -74,18 +90,45 @@ async function loadFile(file, which) {
         return;
     }
     try {
-        const data = await parseCsv(file);
-        if (which === 'inventory') {
-            inventory = data;
-            inventoryName = name;
-            chip('prs-inv-chip', name, data.length);
-        } else {
+        if (which === 'lookup') {
+            const data = await parseCsv(file);
             lookup = data;
             lookupName = name;
-            chip('prs-lu-chip', name, data.length);
+            chip('prs-lu-chip', name, { rows: data.length, bytes: file.size });
+        } else {
+            inventoryFile = file;
+            inventoryName = name;
+            inventoryLarge = isLargeFile(file);
+            if (inventoryLarge) {
+                showWork('Reading inventory headers…', formatBytes(file.size));
+                const { headers } = await peekHeaders(file);
+                hideWork();
+                inventory = [];
+                inventoryHeaders = headers;
+                chip('prs-inv-chip', name, { bytes: file.size, large: true });
+                if (isHardCeiling(file)) {
+                    showBanner(
+                        `${formatBytes(file.size)} inventory. Pick forest units below — a full load of this file will crash the browser tab.`,
+                        'info'
+                    );
+                } else {
+                    showBanner(
+                        `${formatBytes(file.size)} inventory. Scan and pick forest units so only a subset is kept in memory.`,
+                        'info'
+                    );
+                }
+            } else {
+                showWork('Loading inventory…', formatBytes(file.size));
+                const data = await parseCsv(file);
+                hideWork();
+                inventory = data;
+                inventoryHeaders = headerList(data);
+                chip('prs-inv-chip', name, { rows: data.length, bytes: file.size });
+            }
         }
         maybeShowConfig();
     } catch (err) {
+        hideWork();
         showBanner(err.message || String(err));
     }
 }
@@ -99,10 +142,13 @@ async function loadSample() {
         ]);
         inventory = await parseCsv(invText);
         lookup = await parseCsv(luText);
+        inventoryFile = null;
+        inventoryLarge = false;
+        inventoryHeaders = headerList(inventory);
         inventoryName = 'sample_au_prs_inventory.csv';
         lookupName = 'sample_au_prs_lookup.csv';
-        chip('prs-inv-chip', inventoryName, inventory.length);
-        chip('prs-lu-chip', lookupName, lookup.length);
+        chip('prs-inv-chip', inventoryName, { rows: inventory.length });
+        chip('prs-lu-chip', lookupName, { rows: lookup.length });
         maybeShowConfig();
         showBanner('Loaded sample inventory and lookup (SB1 Seed is 45 / 55).', 'info');
     } catch (err) {
@@ -110,24 +156,32 @@ async function loadSample() {
     }
 }
 
-function chip(id, name, n) {
+function chip(id, name, { rows, bytes, large } = {}) {
     const el = document.getElementById(id);
     if (!el) return;
     el.hidden = false;
-    el.innerHTML = `<div class="file-chip-meta"><strong>${esc(name)}</strong> <span>${n.toLocaleString()} rows</span></div>`;
+    const bits = [];
+    if (rows != null) bits.push(`${rows.toLocaleString()} rows`);
+    if (bytes != null) bits.push(formatBytes(bytes));
+    if (large) bits.push('subset required');
+    el.innerHTML = `<div class="file-chip-meta"><strong>${esc(name)}</strong> <span>${bits.join(' · ')}</span></div>`;
 }
 
 function maybeShowConfig() {
-    if (!inventory.length || !lookup.length) return;
+    if (!lookup.length) return;
+    if (!inventory.length && !inventoryHeaders.length) return;
     fillMapping();
     showEl('assign-config-section', true);
     showEl('assign-results-section', false);
     setAssignStep('map');
+    const limit = document.getElementById('prs-fu-limit');
+    if (limit) limit.hidden = false;
+    if (inventory.length) populateFuLimitFromRows();
 }
 
 function fillMapping() {
     const luH = headerList(lookup);
-    const invH = headerList(inventory);
+    const invH = inventoryHeaders.length ? inventoryHeaders : headerList(inventory);
     fillSelect('prs-value-col', luH, detectValueColumn(luH));
     fillSelect('prs-prop-col', luH, detectProportionColumn(luH));
     fillSelect('prs-area-col', invH, detectAreaColumn(invH), true);
@@ -136,7 +190,10 @@ function fillMapping() {
     const polySel = document.getElementById('prs-poly-filter');
     polySel.innerHTML = '<option value="">No filter</option>';
     if (poly) {
-        const vals = [...new Set(inventory.map(r => String(r[poly] ?? '').trim()).filter(Boolean))].sort();
+        const fromRows = inventory.length
+            ? [...new Set(inventory.map(r => String(r[poly] ?? '').trim()).filter(Boolean))]
+            : ['FOR'];
+        const vals = [...new Set(fromRows)].sort();
         for (const v of vals) {
             const o = document.createElement('option');
             o.value = v;
@@ -158,9 +215,87 @@ function fillMapping() {
     };
 }
 
+function fuColumn() {
+    const { inventoryStratumCols } = readStratumPairs();
+    const hit = inventoryStratumCols.find(c => /planfu|^sfu$|yfu|forest.?unit/i.test(c || ''));
+    return hit || inventoryStratumCols[0] || '';
+}
+
+function selectedAssignFus() {
+    return [...document.querySelectorAll('.prs-fu-check:checked')].map(el => el.value);
+}
+
+function setAssignFuChecks(on) {
+    document.querySelectorAll('.prs-fu-check').forEach(el => { el.checked = on; });
+}
+
+function fillAssignFuList(values, { selectAll = true } = {}) {
+    const box = document.getElementById('prs-fu-limit-list');
+    if (!box) return;
+    box.innerHTML = '';
+    for (const u of values || []) {
+        const lab = document.createElement('label');
+        lab.className = 'fu-chip';
+        lab.innerHTML = `<input type="checkbox" class="prs-fu-check" value="${esc(u)}" ${selectAll ? 'checked' : ''}> ${esc(u)}`;
+        box.appendChild(lab);
+    }
+}
+
+function populateFuLimitFromRows() {
+    const col = fuColumn();
+    if (!col || !inventory.length) return;
+    const vals = [...new Set(inventory.map(r => String(r[col] ?? '').trim()).filter(Boolean))].sort();
+    fillAssignFuList(vals, { selectAll: true });
+}
+
+async function scanInventoryFus() {
+    hideBanner();
+    const col = fuColumn();
+    const polyCol = document.getElementById('prs-poly-col')?.value;
+    if (!col) {
+        showBanner('Map a forest-unit / PLANFU stratum column first.');
+        return;
+    }
+    const source = inventoryFile;
+    if (!source && !inventory.length) {
+        showBanner('Upload an inventory CSV first.');
+        return;
+    }
+    try {
+        if (inventory.length) {
+            populateFuLimitFromRows();
+            return;
+        }
+        showWork('Scanning forest units…', formatBytes(source.size));
+        const cols = [col, polyCol].filter(Boolean);
+        const cat = await catalogUniques(source, cols, {
+            onProgress: (p) => updateWork('Scanning forest units…', progressLine(p), p.pct)
+        });
+        hideWork();
+        fillAssignFuList(cat.values[col] || [], { selectAll: !inventoryLarge });
+        const polySel = document.getElementById('prs-poly-filter');
+        const polyVals = cat.values[polyCol] || [];
+        if (polySel && polyVals.length) {
+            const current = polySel.value;
+            polySel.innerHTML = '<option value="">No filter</option>';
+            for (const v of polyVals) {
+                const o = document.createElement('option');
+                o.value = v;
+                o.textContent = v;
+                if (v === current || (!current && v.toUpperCase() === 'FOR')) o.selected = true;
+                polySel.appendChild(o);
+            }
+        }
+        showBanner(`Found ${(cat.values[col] || []).length} forest unit(s) in ${cat.rowsSeen.toLocaleString()} rows.`, 'info');
+    } catch (err) {
+        hideWork();
+        showBanner(err.message || String(err));
+    }
+}
+
 function addStratumRow(luVal = '', invVal = '') {
     const luH = headerList(lookup);
-    const invH = headerList(inventory);
+    const invH = inventoryHeaders.length ? inventoryHeaders : headerList(inventory);
     const box = document.getElementById('prs-stratum-list');
     const row = document.createElement('div');
     row.className = 'stratum-row';
@@ -185,9 +320,9 @@ function readStratumPairs() {
     return { lookupStratumCols: lu, inventoryStratumCols: inv };
 }
 
-function runAssign() {
+async function runAssign() {
     hideBanner();
-    if (!inventory.length || !lookup.length) {
+    if (!lookup.length || (!inventory.length && !inventoryFile)) {
         showBanner('Upload both the inventory and the lookup CSV.');
         return;
     }
@@ -198,8 +333,49 @@ function runAssign() {
     }
     const outCol = (document.getElementById('prs-out-col').value || 'AU_PRS').trim();
     const seedRaw = document.getElementById('prs-seed').value;
+    const caseInsensitive = isChecked('prs-case', true);
+    const fus = selectedAssignFus();
+    const fuCol = fuColumn();
+
+    if (inventoryLarge && !fus.length) {
+        showBanner('This inventory is too large to load whole. Scan and pick at least one forest unit.');
+        return;
+    }
+
+    let rows = inventory;
     try {
-        lastResult = assignPostRenewal(inventory, lookup, {
+        const allow = new Set(fus.map(v => caseInsensitive ? v.toUpperCase() : v));
+        const keepFu = (row) => {
+            if (!fuCol || !allow.size) return true;
+            const v = String(row[fuCol] ?? '').trim();
+            const key = caseInsensitive ? v.toUpperCase() : v;
+            return allow.has(key);
+        };
+        if (inventory.length && fus.length && fuCol) {
+            rows = inventory.filter(keepFu);
+        } else if (!inventory.length && inventoryFile) {
+            showWork('Extracting inventory subset…', formatBytes(inventoryFile.size));
+            const extracted = await collectRows(inventoryFile, {
+                maxRows: MAX_RETAINED_ROWS,
+                filterRow: keepFu,
+                onProgress: (p) => updateWork(
+                    'Extracting inventory subset…',
+                    progressLine({ ...p, extra: 'matching forest units' }),
+                    p.pct
+                )
+            });
+            hideWork();
+            if (extracted.aborted) {
+                showBanner(extracted.abortReason || 'Too many rows kept. Narrow the forest-unit list.');
+                return;
+            }
+            rows = extracted.rows;
+        }
+        if (!rows.length) {
+            showBanner('No inventory rows matched the selected forest units.');
+            return;
+        }
+        lastResult = assignPostRenewal(rows, lookup, {
             lookupStratumCols,
             inventoryStratumCols,
             valueCol: document.getElementById('prs-value-col').value,
@@ -210,9 +386,10 @@ function runAssign() {
             fillBlanksOnly: isChecked('prs-fill-blanks'),
             polytypeCol: document.getElementById('prs-poly-col').value,
             polytypeFilter: document.getElementById('prs-poly-filter').value,
-            caseInsensitive: isChecked('prs-case', true)
+            caseInsensitive
         });
     } catch (err) {
+        hideWork();
         showBanner(err.message || String(err));
         return;
     }
@@ -317,10 +494,17 @@ function chartAssigned() {
 
 function resetAssign() {
     inventory = [];
+    inventoryFile = null;
+    inventoryHeaders = [];
+    inventoryLarge = false;
     lookup = [];
     lastResult = null;
     inventoryName = '';
     lookupName = '';
+    const fuList = document.getElementById('prs-fu-limit-list');
+    if (fuList) fuList.innerHTML = '';
+    const limit = document.getElementById('prs-fu-limit');
+    if (limit) limit.hidden = true;
     const invIn = document.getElementById('prs-inv-input');
     const luIn = document.getElementById('prs-lu-input');
     if (invIn) invIn.value = '';

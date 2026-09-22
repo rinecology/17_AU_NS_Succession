@@ -6,12 +6,17 @@ import {
     detectAreaColumn,
     detectFromToColumns
 } from './parse.js';
-import { computePathways, transitionsToCsv } from './proportions.js';
+import { computePathways, computePathwaysFromFile, filterPathways, transitionsToCsv } from './proportions.js';
 import { drawSankey, drawHeatmap } from './viz.js';
 import { initAssign } from './assign-ui.js';
+import { peekHeaders, isLargeFile, formatBytes } from './csv-stream.js';
+import { showWork, updateWork, hideWork, progressLine } from './work-overlay.js';
 
 let currentData = [];
+let currentFile = null;
+let currentFileName = '';
 let lastResult = null;
+let lastFullResult = null;
 
 document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('unit-list').value = NER_BOREAL_UNITS.join(', ');
@@ -20,6 +25,8 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('download-csv-btn').addEventListener('click', downloadCsv);
     document.getElementById('reset-btn').addEventListener('click', reset);
     document.getElementById('sample-btn').addEventListener('click', loadSample);
+    document.getElementById('fu-all')?.addEventListener('click', () => setAllFuChecks(true));
+    document.getElementById('fu-none')?.addEventListener('click', () => setAllFuChecks(false));
     document.querySelectorAll('input[name="mode"]').forEach(r => {
         r.addEventListener('change', syncModeUi);
     });
@@ -41,8 +48,10 @@ function setTask(name) {
 
 function switchToChart(rows, { auColumn = '', fileName = 'assigned.csv' } = {}) {
     currentData = rows;
+    currentFile = null;
+    currentFileName = fileName;
     setTask('chart');
-    showFileChip(fileName, rows.length);
+    showFileChip(fileName, { rows: rows.length });
     fillColumnSelects(Object.keys(rows[0] || {}));
     if (auColumn) {
         const sel = document.getElementById('au-column');
@@ -77,28 +86,60 @@ function bindUpload() {
     });
 }
 
-function readFile(file) {
+async function readFile(file) {
     hideBanner();
     if (!file.name.toLowerCase().endsWith('.csv')) {
         showBanner('Please drop a CSV file.');
         return;
     }
-    Papa.parse(file, {
-        header: true,
-        skipEmptyLines: true,
-        complete: (res) => {
-            if (!res.data?.length) {
+    currentFile = file;
+    currentFileName = file.name;
+    currentData = [];
+    lastResult = null;
+    lastFullResult = null;
+    try {
+        showWork('Reading headers…', formatBytes(file.size));
+        const { headers } = await peekHeaders(file);
+        hideWork();
+        if (!headers.length) {
+            showBanner('CSV has no header row.');
+            return;
+        }
+        if (!isLargeFile(file)) {
+            showWork('Loading CSV…', formatBytes(file.size));
+            currentData = await parseCsvFull(file);
+            hideWork();
+            if (!currentData.length) {
                 showBanner('CSV has no data rows.');
                 return;
             }
-            currentData = res.data;
-            showFileChip(file.name, res.data.length);
-            fillColumnSelects(Object.keys(res.data[0]));
-            showEl('config-section', true);
-            showEl('results-section', false);
-            setStep('configure');
-        },
-        error: (err) => showBanner('Could not parse CSV: ' + err.message)
+            showFileChip(file.name, { rows: currentData.length, bytes: file.size });
+        } else {
+            showFileChip(file.name, { bytes: file.size, large: true });
+            showBanner(
+                `${formatBytes(file.size)} file. Pathways will be summed while streaming — the full table is not kept in memory.`,
+                'info'
+            );
+        }
+        fillColumnSelects(headers);
+        showEl('config-section', true);
+        showEl('results-section', false);
+        setStep('configure');
+    } catch (err) {
+        hideWork();
+        showBanner(err.message || String(err));
+    }
+}
+
+function parseCsvFull(file) {
+    return new Promise((resolve, reject) => {
+        Papa.parse(file, {
+            header: true,
+            skipEmptyLines: true,
+            transformHeader: h => String(h ?? '').replace(/^\uFEFF/, '').trim(),
+            complete: (res) => resolve(res.data || []),
+            error: (err) => reject(err || new Error('Could not parse CSV.'))
+        });
     });
 }
 
@@ -111,7 +152,9 @@ async function loadSample() {
         });
         const res = Papa.parse(text, { header: true, skipEmptyLines: true });
         currentData = res.data;
-        showFileChip('sample_au_ns.csv', res.data.length);
+        currentFile = null;
+        currentFileName = 'sample_au_ns.csv';
+        showFileChip('sample_au_ns.csv', { rows: res.data.length });
         fillColumnSelects(Object.keys(res.data[0]));
         showEl('config-section', true);
         showEl('results-section', false);
@@ -157,14 +200,14 @@ function syncModeUi() {
     document.getElementById('to-col-group').hidden = !cols;
 }
 
-function run() {
+async function run() {
     hideBanner();
-    if (!currentData.length) {
+    if (!currentData.length && !currentFile) {
         showBanner('Upload a CSV first.');
         return;
     }
     const mode = document.querySelector('input[name="mode"]:checked')?.value || 'code';
-    const result = computePathways(currentData, {
+    const options = {
         mode,
         auColumn: document.getElementById('au-column').value,
         fromColumn: document.getElementById('from-column').value,
@@ -172,8 +215,34 @@ function run() {
         areaColumn: document.getElementById('area-column').value,
         delimiter: document.getElementById('delimiter').value,
         units: parseUnitList(document.getElementById('unit-list').value)
-    });
+    };
+
+    let result;
+    try {
+        if (currentData.length) {
+            result = computePathways(currentData, options);
+        } else {
+            showWork('Computing pathways…', `Streaming ${formatBytes(currentFile.size)}`);
+            result = await computePathwaysFromFile(currentFile, options, {
+                onProgress: (p) => updateWork(
+                    'Computing pathways…',
+                    progressLine(p),
+                    p.pct
+                )
+            });
+            hideWork();
+        }
+    } catch (err) {
+        hideWork();
+        showBanner(err.message || String(err));
+        return;
+    }
+
+    lastFullResult = result;
     lastResult = result;
+    fillFuFilter(result.fromUnits);
+    renderPathwayView(result);
+    document.getElementById('results-section').scrollIntoView({ behavior: 'smooth' });
 
     if (!result.transitions.length) {
         showBanner('No pathways parsed. Check the AU column, delimiter, and known-unit list.');
@@ -182,9 +251,40 @@ function run() {
     if (result.unparsed) {
         showBanner(`${result.unparsed.toLocaleString()} row(s) could not be decoded. They are omitted from the charts.`, 'info');
     }
+}
 
+function fillFuFilter(fromUnits) {
+    const box = document.getElementById('fu-filter-list');
+    if (!box) return;
+    box.innerHTML = '';
+    for (const u of fromUnits || []) {
+        const lab = document.createElement('label');
+        lab.className = 'fu-chip';
+        lab.innerHTML = `<input type="checkbox" class="fu-from-check" value="${esc(u)}" checked> ${esc(u)}`;
+        lab.querySelector('input').addEventListener('change', applyFuFilter);
+        box.appendChild(lab);
+    }
+}
+
+function selectedFromUnits() {
+    return [...document.querySelectorAll('.fu-from-check:checked')].map(el => el.value);
+}
+
+function setAllFuChecks(on) {
+    document.querySelectorAll('.fu-from-check').forEach(el => { el.checked = on; });
+    applyFuFilter();
+}
+
+function applyFuFilter() {
+    if (!lastFullResult) return;
+    const selected = selectedFromUnits();
+    lastResult = filterPathways(lastFullResult, selected);
+    renderPathwayView(lastResult);
+}
+
+function renderPathwayView(result) {
     document.getElementById('stat-parsed').textContent = result.parsed.toLocaleString();
-    document.getElementById('stat-unparsed').textContent = result.unparsed.toLocaleString();
+    document.getElementById('stat-unparsed').textContent = (lastFullResult?.unparsed ?? result.unparsed).toLocaleString();
     document.getElementById('stat-from').textContent = result.nFrom.toLocaleString();
     const areaLabel = result.areaUnit === 'count'
         ? `${result.totalHa.toLocaleString()} rec`
@@ -194,8 +294,6 @@ function run() {
     renderTable(result.transitions);
     showEl('results-section', true);
     setStep('results');
-    document.getElementById('results-section').scrollIntoView({ behavior: 'smooth' });
-
     drawSankey(document.getElementById('sankey'), result.transitions);
     drawHeatmap(document.getElementById('heatmap'), result);
 }
@@ -224,23 +322,30 @@ function downloadCsv() {
     URL.revokeObjectURL(a.href);
 }
 
+function showFileChip(name, { rows, bytes, large } = {}) {
+    const el = document.getElementById('file-info');
+    el.hidden = false;
+    const bits = [];
+    if (rows != null) bits.push(`${rows.toLocaleString()} rows`);
+    if (bytes != null) bits.push(formatBytes(bytes));
+    if (large) bits.push('streamed');
+    el.innerHTML = `<div class="file-chip-meta"><strong>${esc(name)}</strong> <span>${bits.join(' · ')}</span></div>
+        <button type="button" class="btn btn-secondary" id="change-file">Change file</button>`;
+    document.getElementById('change-file').addEventListener('click', () => document.getElementById('file-input').click());
+}
+
 function reset() {
     currentData = [];
+    currentFile = null;
+    currentFileName = '';
     lastResult = null;
+    lastFullResult = null;
     document.getElementById('file-input').value = '';
     document.getElementById('file-info').hidden = true;
     showEl('config-section', false);
     showEl('results-section', false);
     hideBanner();
     setStep('upload');
-}
-
-function showFileChip(name, n) {
-    const el = document.getElementById('file-info');
-    el.hidden = false;
-    el.innerHTML = `<div class="file-chip-meta"><strong>${esc(name)}</strong> <span>${n.toLocaleString()} rows</span></div>
-        <button type="button" class="btn btn-secondary" id="change-file">Change file</button>`;
-    document.getElementById('change-file').addEventListener('click', () => document.getElementById('file-input').click());
 }
 
 function setStep(name) {

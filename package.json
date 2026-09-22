@@ -1,7 +1,7 @@
 {
   "name": "au-ns-natural-succession",
-  "version": "0.2.0",
-  "description": "Succession pathways: chart AU_NS codes and assign post-renewal AUs from a lookup table",
+  "version": "0.3.0",
+  "description": "Succession pathways: chart AU_NS / AU_PRS codes, assign post-renewal AUs, stream large CSVs",
   "type": "module",
   "scripts": {
     "dev": "vite",

@@ -5,6 +5,7 @@ const ROSE = '#b76e79';
 
 export function drawSankey(el, transitions) {
     Plotly.purge(el);
+    el.innerHTML = '';
     const df = transitions.filter(t => t.area_ha > 0);
     if (!df.length) {
         el.innerHTML = '<p class="note">No parsed pathways to draw.</p>';
@@ -53,6 +54,7 @@ export function drawSankey(el, transitions) {
 
 export function drawHeatmap(el, { matrix, fromUnits, toUnits }) {
     Plotly.purge(el);
+    el.innerHTML = '';
     if (!fromUnits.length || !toUnits.length) {
         el.innerHTML = '<p class="note">No matrix to draw.</p>';
         return;
